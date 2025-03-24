@@ -20,7 +20,8 @@ const prisma = new client_1.PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 const signup = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { email, password } = req.body;
+        // Extract profile fields from request body
+        const { email, password, name, bio, mobilenumber, address, rate } = req.body;
         // Check if user exists
         const existingUser = yield prisma.user.findUnique({ where: { email } });
         if (existingUser) {
@@ -29,16 +30,36 @@ const signup = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         }
         // Hash password
         const hashedPassword = yield bcryptjs_1.default.hash(password, 12);
-        // MongoDB automatically creates collections when first used
-        const user = yield prisma.user.create({
-            data: {
-                email,
-                password: hashedPassword
-            }
-        });
+        // Create user and profile in transaction
+        const [user, profile] = yield prisma.$transaction([
+            prisma.user.create({
+                data: {
+                    email,
+                    password: hashedPassword
+                }
+            }),
+            prisma.profile.create({
+                data: {
+                    name,
+                    email, // Links to user email
+                    bio,
+                    mobilenumber,
+                    address,
+                    rate: Number(rate)
+                }
+            })
+        ]);
         // Create JWT
         const token = jsonwebtoken_1.default.sign({ email: user.email, id: user.id }, JWT_SECRET, { expiresIn: '1h' });
-        res.status(201).json({ user, token });
+        res
+            .cookie('auth_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 3600000 // 1 hour
+        })
+            .status(201)
+            .json({ user, profile });
     }
     catch (error) {
         res.status(500).json({ message: 'Something went wrong' });
@@ -59,7 +80,15 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             return;
         }
         const token = jsonwebtoken_1.default.sign({ email: user.email, id: user.id }, JWT_SECRET, { expiresIn: '1h' });
-        res.status(200).json({ user, token });
+        res
+            .cookie('auth_token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 3600000
+        })
+            .status(200)
+            .json({ user });
     }
     catch (error) {
         res.status(500).json({ message: 'Something went wrong' });

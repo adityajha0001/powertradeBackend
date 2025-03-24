@@ -14,19 +14,22 @@ datasource db {
 }
 
 model Profile {
-  id    String @id @default(auto()) @map("_id") @db.ObjectId
-  name  String
-  email String @unique
-  bio String
+  id     String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId String  @unique @db.ObjectId
+  user   User    @relation(fields: [userId], references: [id])
+  name   String
+  bio    String
   mobilenumber String
   address String
-  rate Int
+  rate   Int
 }
 
 model User {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   email     String   @unique
   password  String
+  city      String
+  profile   Profile?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 } 
